@@ -1,27 +1,25 @@
-# 使用 slim 版本作为基础镜像
-FROM node:slim
+# 1. 使用 Alpine Linux 基础镜像，它的体积非常小
+FROM node:20.11.1-alpine3.19
 
-# 设置工作目录
+# 2. 设置工作目录
 WORKDIR /app
 
-# --- 优化步骤 ---
-# 1. 单独复制 package.json，以便利用缓存
+# 3. 优化缓存：先拷贝 package.json 并安装依赖
+#    这样在代码变更但依赖不变的情况下，可以利用 Docker 缓存，加快构建速度
 COPY package.json ./
 
-# 2. 更新包管理器、安装依赖，并清理缓存以减小镜像体积
-#    这里是解决您问题的关键，我们安装了 curl 和 gawk
-RUN apt-get update && \
-    apt-get install -y curl gawk && \
-    npm install && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# 4. 安装必要的系统依赖和 Node.js 包
+#    关键：添加了 gawk (提供 awk 命令) 和 coreutils (提供 nohup 命令)
+#    --no-cache 标志可以确保不保留包管理器的缓存，减小镜像体积
+RUN apk add --no-cache curl gawk coreutils && \
+    npm install
 
-# 3. 复制剩余的应用文件
+# 5. 拷贝所有剩余的项目文件到工作目录
 COPY manager.js ./
 COPY index.html ./
 
-# 暴露应用端口
+# 6. 暴露应用监听的端口
 EXPOSE 3000
 
-# 定义容器启动命令
-CMD ["node", "manager.js"]
+# 7. 定义容器启动时执行的命令 (使用 package.json 中的 "start" 脚本)
+CMD ["npm", "start"]
